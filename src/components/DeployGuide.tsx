@@ -73,7 +73,7 @@ PING_INTERVAL_SECONDS=240
             <div className="p-3 bg-[#030610] rounded border border-cyan-950">
               <span className="text-cyan-400 font-bold block mb-1">Option B: Deploying JARVIS Python Backend</span>
               <span className="text-slate-400">
-                If you intended to deploy the Python backend, in Render Web Service settings change <strong>Environment</strong> from <em>Node</em> to <em>Python 3</em>. Set Build to <code className="text-amber-200">pip install -r requirements.txt</code> and Start to <code className="text-amber-200">gunicorn app:app --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT</code>.
+                Fixed in root! <code className="text-cyan-300">requirements.txt</code>, <code className="text-cyan-300">app.py</code>, and all Python modules have been placed directly in the repository root directory. <code className="text-amber-200">pip install -r requirements.txt</code> will now succeed immediately on Render. If your files are in a subfolder, either set Render's <strong>Root Directory</strong> setting to that folder name, or use <code className="text-amber-200">pip install -r requirements.txt</code> at root.
               </span>
             </div>
           </div>
