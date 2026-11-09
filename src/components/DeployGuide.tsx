@@ -54,6 +54,32 @@ PING_INTERVAL_SECONDS=240
         </div>
       </div>
 
+      {/* Render Troubleshooting Alert for yarn start */}
+      <div className="p-4 bg-amber-950/40 border border-amber-500/50 rounded-lg space-y-2">
+        <div className="text-xs font-bold text-amber-300 flex items-center gap-2 uppercase tracking-wider">
+          <span>Troubleshooting: "error Command 'start' not found" on Render</span>
+        </div>
+        <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
+          <p>
+            <strong>Why this happened:</strong> Render detected a Node.js repository and executed <code className="text-amber-200">yarn start</code>, but the original project lacked a <code className="text-cyan-300">"start"</code> script.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-[11px]">
+            <div className="p-3 bg-[#030610] rounded border border-cyan-950">
+              <span className="text-cyan-400 font-bold block mb-1">Option A: Deploying this Web Studio (Node)</span>
+              <span className="text-slate-400">
+                Fixed! <code className="text-cyan-300">"start": "node server.js"</code> has now been added to <code className="text-cyan-300">package.json</code>, backed by Express production server. Redploying on Render will now succeed automatically.
+              </span>
+            </div>
+            <div className="p-3 bg-[#030610] rounded border border-cyan-950">
+              <span className="text-cyan-400 font-bold block mb-1">Option B: Deploying JARVIS Python Backend</span>
+              <span className="text-slate-400">
+                If you intended to deploy the Python backend, in Render Web Service settings change <strong>Environment</strong> from <em>Node</em> to <em>Python 3</em>. Set Build to <code className="text-amber-200">pip install -r requirements.txt</code> and Start to <code className="text-amber-200">gunicorn app:app --workers 1 --threads 4 --timeout 300 --bind 0.0.0.0:$PORT</code>.
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* 4-Step Checklist */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
         <div className="p-4 bg-[#08101e] border border-cyan-900/30 rounded-lg space-y-2">
