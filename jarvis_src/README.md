@@ -1,154 +1,241 @@
-# JARVIS AI Assistant Backend v2.0 (Production Edition)
+# JARVIS AI Assistant Backend v2.1 (Multi-User & Gmail Edition)
 
-Production-grade Flask backend for JARVIS — Just A Rather Very Intelligent System.
-Designed to power the futuristic JARVIS Android client and web interfaces with real-time AI streaming, multi-provider fallback, structured device control actions, Google Calendar, and Gmail integrations.
-
----
-
-## ⚡ Core Upgrades in v2.0
-
-1. **Multi-Provider AI Architecture & Automatic Fallback**:
-   - Primary: `llm7` (anonymous free or API key)
-   - Fallback 1: `pollinations` (keyless anonymous AI provider)
-   - Fallback 2: `groq` (ultra fast inference)
-   - Fallback 3: `gemini` (Google Gemini 2.5 Flash)
-   - Fallback 4: `openai` (GPT-4o mini)
-   - Fallback 5: `claude` (Anthropic Claude 3.5 Sonnet)
-   - Configurable order via `LLM_PROVIDER_ORDER`. Automatic 30s circuit breaker on rate limits/transient errors.
-
-2. **Real-Time Live Chat with Token Streaming (SSE)**:
-   - `POST /api/chat/stream`: Server-Sent Events stream delivering tokens as they arrive.
-   - `POST /api/chat/stop`: Cancels active text generation.
-   - `POST /api/chat`: Traditional synchronous endpoint with structured JSON response.
-
-3. **Structured Android Device Control Actions**:
-   - Parses natural language and returns structured action payloads for the Android APK:
-     - `set_timer`: `{ "type": "device_action", "action": "set_timer", "seconds": 300, "label": "Tea" }`
-     - `set_alarm`: `{ "type": "device_action", "action": "set_alarm", "time": "06:00" }`
-     - `create_reminder`: `{ "type": "device_action", "action": "create_reminder", "text": "Buy groceries", "due": "5pm" }`
-     - `open_app`: `{ "type": "device_action", "action": "open_app", "app": "youtube" }`
-     - `open_settings`: `{ "type": "device_action", "action": "open_settings", "section": "wifi" }`
-     - `open_maps`: `{ "type": "device_action", "action": "open_maps", "query": "coffee shops" }`
-
-4. **Google Calendar & Clock**:
-   - `GET /api/calendar/events`: List events with default timezone `Asia/Kolkata`.
-   - `POST /api/calendar/events`: Create events with automatic conflict detection.
-   - `DELETE /api/calendar/events/<id>`: Delete event.
-
-5. **Gmail Integration with Send-Confirmation Safeguard**:
-   - `GET /api/email/messages`: List and search inbox.
-   - `POST /api/email/draft`: Save email drafts.
-   - `POST /api/email/send`: Enforces preview and explicit confirmation before dispatching.
-
-6. **Unified Storage Engine**:
-   - SQLite (`jarvis.db`) for zero-configuration persistent storage.
-   - PostgreSQL support via `DATABASE_URL`.
-   - MongoDB support via `MONGODB_URI` (GridFS for media).
-   - In-memory fallback if no database is reachable.
+Production-grade Python/Flask backend for JARVIS — Just A Rather Very Intelligent System.
+Includes full multi-user authentication, Google OAuth 2.0 with strict email match verification, complete Gmail integration with pagination & security safeguards, AI provider fallback, and Android device action dispatchers.
 
 ---
 
-## 📡 API Reference & Android Contract
+## 🚀 Key Features
 
-### 1. Live Chat (`POST /api/chat`)
-**Headers:**
-```
-Content-Type: application/json
-X-API-Token: <YOUR_APP_API_TOKEN>
-```
-**Body:**
+1. **Multi-User Authentication & Security**:
+   - Registration, login, logout, password hashing (Werkzeug PBKDF2/scrypt).
+   - JWT Access tokens (1 hour) & Refresh tokens (30 days) with database tracking & rotation.
+   - Email verification & password recovery tokens.
+   - Strict per-user data isolation: users never see other users' messages, emails, or tokens.
+   - At-rest token encryption for third-party OAuth credentials.
+
+2. **Google OAuth 2.0 with Strict Account Match Guard**:
+   - Connects Google account to JARVIS user.
+   - **Critical Security Invariant**: Rejects connection if the Google account email does not match the registered JARVIS email!
+   - Refresh token rotation & automatic access token refreshing.
+
+3. **Complete Gmail Integration (Not Just the Latest Email)**:
+   - Mailbox categories: `INBOX`, `SENT`, `DRAFT`, `STARRED`, `IMPORTANT`, `SPAM`, `TRASH`, `ALL`.
+   - Full pagination via `pageToken` and `nextPageToken`.
+   - Rich message details: Sender, Recipient, Subject, Date, plain-text body, HTML body, labels, attachments metadata.
+   - Operations: Mark as read/unread, star/unstar, archive, move to trash/restore, create draft, update draft.
+   - Send, Reply, Reply All, Forward with mandatory confirmation preview safeguard.
+
+4. **JARVIS AI Voice & Email Assistant**:
+   - Context-aware email assistant: "Check my inbox", "Show unread emails", "Summarize this email", "Draft an email to X".
+   - Generates structured device actions for Android APK (`open_app`, `set_timer`, `set_alarm`, `list_emails`, `draft_email`).
+   - Real-time SSE token streaming via `POST /api/chat/stream`.
+
+5. **Storage & Deployment**:
+   - Zero-setup persistent SQLite (`jarvis.db`) and PostgreSQL support (`DATABASE_URL`).
+   - Built-in keepalive loop for Render free tier.
+
+---
+
+## 📡 API Contract for Android Developers
+
+### Authentication Endpoints
+
+#### 1. Register User
+`POST /api/auth/register`
 ```json
 {
-  "message": "Set a timer for 10 minutes and wake me up at 7am",
-  "conversation_id": "conv-12345",
-  "provider": "auto"
+  "full_name": "Tony Stark",
+  "email": "tony@stark.com",
+  "password": "SecretPassword123!",
+  "confirm_password": "SecretPassword123!"
 }
 ```
+**Response (201 Created):**
+```json
+{
+  "status": "success",
+  "user": {
+    "id": "e9b14c81a2f4",
+    "full_name": "Tony Stark",
+    "email": "tony@stark.com",
+    "is_verified": true
+  },
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+#### 2. Login User
+`POST /api/auth/login`
+```json
+{
+  "email": "tony@stark.com",
+  "password": "SecretPassword123!"
+}
+```
+**Response (200 OK):**
+```json
+{
+  "status": "success",
+  "user": {
+    "id": "e9b14c81a2f4",
+    "full_name": "Tony Stark",
+    "email": "tony@stark.com",
+    "is_google_connected": true,
+    "google_email": "tony@stark.com"
+  },
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+#### 3. Refresh Access Token
+`POST /api/auth/refresh`
+```json
+{
+  "refresh_token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+---
+
+### Google OAuth Endpoints
+
+#### 1. Start Google OAuth
+`GET /api/auth/google/start`
+**Header:** `Authorization: Bearer <access_token>`
 **Response:**
 ```json
 {
   "status": "success",
-  "conversation_id": "conv-12345",
-  "message_id": "a9f82d1c",
-  "content": "I have scheduled your 10-minute timer and set an alarm for 7:00 AM.",
-  "provider": "llm7",
-  "actions": [
-    {
-      "type": "device_action",
-      "action": "set_timer",
-      "seconds": 600,
-      "label": "JARVIS Timer",
-      "requires_confirmation": false
-    },
-    {
-      "type": "device_action",
-      "action": "set_alarm",
-      "time": "7am",
-      "label": "JARVIS Alarm",
-      "requires_confirmation": false
-    }
-  ],
-  "tasks": [],
-  "timestamp": "2026-11-09T17:15:00Z"
+  "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth?client_id=...",
+  "state": "user_id:random_state"
 }
 ```
 
-### 2. Live Streaming Chat (`POST /api/chat/stream`)
-Accepts the same body, returns `text/event-stream`:
+#### 2. Complete / Connect Google OAuth
+`POST /api/auth/google/connect`
+**Header:** `Authorization: Bearer <access_token>`
+```json
+{
+  "code": "4/0AeanS0...",
+  "redirect_uri": "https://<app>.onrender.com/api/auth/google/callback"
+}
 ```
-data: {"type": "start", "conversation_id": "conv-12345", "provider": "llm7", "request_id": "req-99"}
-
-data: {"type": "token", "token": "Good "}
-data: {"type": "token", "token": "morning, "}
-data: {"type": "token", "token": "sir. "}
-
-data: {"type": "actions", "actions": [{"type": "device_action", "action": "set_timer", "seconds": 300}]}
-
-data: {"type": "done", "status": "success", "message_id": "a9f82d1c"}
-```
-
-### 3. Conversations Management
-- `GET /api/chat/conversations`: List active conversations.
-- `GET /api/chat/history?conversation_id=<id>`: Retrieve conversation history.
-- `DELETE /api/chat/conversations/<id>`: Delete conversation.
+*Note: If the Google account does not match your JARVIS email, it returns HTTP 403 `ACCOUNT_MISMATCH`.*
 
 ---
 
-## 🛠 Local Setup & Testing
+### Gmail Endpoints
 
-1. Clone or extract the repository:
+All Gmail endpoints require `Authorization: Bearer <access_token>`.
+
+#### 1. List Emails (with Pagination & Categories)
+`GET /api/gmail/messages?category=inbox&maxResults=15&pageToken=optional_token`
+**Response:**
+```json
+{
+  "status": "success",
+  "category": "inbox",
+  "messages": [
+    {
+      "id": "18f0a2b4",
+      "threadId": "18f0a2b4",
+      "sender": "Prof. Sharma <placement@university.edu>",
+      "recipient": "tony@stark.com",
+      "subject": "Campus Placement Drive 2026",
+      "date": "2026-11-10 10:15:00",
+      "snippet": "Shortlist and interview schedule for Monday...",
+      "body_plain": "Full email text content...",
+      "body_html": "<p>Full HTML content...</p>",
+      "is_unread": true,
+      "is_starred": false,
+      "labels": ["INBOX", "UNREAD"],
+      "attachments": [
+        {
+          "id": "att_01",
+          "filename": "schedule.pdf",
+          "mimeType": "application/pdf",
+          "size": 182000
+        }
+      ]
+    }
+  ],
+  "nextPageToken": "15",
+  "resultSizeEstimate": 42
+}
+```
+
+#### 2. Get Single Email Details
+`GET /api/gmail/messages/{id}`
+
+#### 3. Search Mailbox
+`GET /api/gmail/search?q=placement&maxResults=15`
+
+#### 4. Email Actions
+- Mark Read: `POST /api/gmail/messages/{id}/read`
+- Mark Unread: `POST /api/gmail/messages/{id}/unread`
+- Star: `POST /api/gmail/messages/{id}/star`
+- Unstar: `POST /api/gmail/messages/{id}/unstar`
+- Archive: `POST /api/gmail/messages/{id}/archive`
+- Trash: `POST /api/gmail/messages/{id}/trash`
+- Restore: `POST /api/gmail/messages/{id}/restore`
+
+#### 5. Send Email with Confirmation Safeguard
+`POST /api/gmail/send`
+```json
+{
+  "to": "pepper@stark.com",
+  "subject": "Board Meeting",
+  "body": "I will be arriving at 3 PM.",
+  "confirmed": false
+}
+```
+*If `confirmed: false`, JARVIS returns a preview requiring explicit user confirmation before sending.*
+To dispatch:
+```json
+{
+  "to": "pepper@stark.com",
+  "subject": "Board Meeting",
+  "body": "I will be arriving at 3 PM.",
+  "confirmed": true
+}
+```
+
+#### 6. Reply and Forward
+- Reply: `POST /api/gmail/messages/{id}/reply` (`{ "body": "...", "reply_all": false, "confirmed": true }`)
+- Forward: `POST /api/gmail/messages/{id}/forward` (`{ "to": "colleague@stark.com", "body": "FYI", "confirmed": true }`)
+
+---
+
+## 🤖 AI Assistant with Live Streaming (`POST /api/chat/stream`)
+Accepts `message` and streams real-time SSE token chunks:
+```
+data: {"type": "start", "conversation_id": "c-123", "provider": "llm7"}
+
+data: {"type": "token", "token": "You have "}
+data: {"type": "token", "token": "2 unread emails in your inbox."}
+
+data: {"type": "actions", "actions": [{"type": "email_action", "action": "list_emails", "category": "inbox"}]}
+
+data: {"type": "done", "status": "success"}
+```
+
+---
+
+## 🛠 Deployment & Setup
+
+1. Copy `.env.example` to `.env`.
+2. Install dependencies:
    ```bash
-   cd JARVIS-main
    pip install -r requirements.txt
    ```
-2. Copy `.env.example` to `.env`:
+3. Run automated tests:
    ```bash
-   cp .env.example .env
+   python -m unittest tests/test_auth_gmail.py
    ```
-3. Set `ALLOW_NO_AUTH=true` for local zero-auth testing or generate an `APP_API_TOKEN`.
-4. Run the server:
+4. Start server:
    ```bash
-   python app.py
+   gunicorn app:app --workers 1 --threads 4 --bind 0.0.0.0:$PORT
    ```
-5. Test endpoints:
-   ```bash
-   # Health check
-   curl -s http://localhost:8000/health
-
-   # Test chat
-   curl -s -X POST http://localhost:8000/api/chat \
-     -H "Content-Type: application/json" \
-     -d '{"message": "Hello JARVIS"}'
-   ```
-
----
-
-## 🚀 Deploy to Render
-
-1. Push your repository to GitHub.
-2. In Render, click **New > Blueprint** and select the repository.
-3. Configure the secret environment variables in the Render dashboard:
-   - `APP_API_TOKEN`
-   - Provider keys: `GROQ_API_KEY`, `GEMINI_API_KEY`, etc. (LLM7 and Pollinations work out of the box without keys)
-   - Optional: `GOOGLE_CLIENT_ID`, `GMAIL_CLIENT_ID`, `DATABASE_URL`
-4. The service will build and auto-run with keepalive active.

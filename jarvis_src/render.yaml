@@ -9,8 +9,22 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: APP_SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
       - key: APP_API_TOKEN
         sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: DEFAULT_TIMEZONE
+        value: Asia/Kolkata
       - key: LLM_PROVIDER_ORDER
         value: llm7,pollinations,groq,gemini,openai,claude
       - key: LLM7_API_KEY
@@ -23,24 +37,10 @@ services:
         sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: HUGGINGFACE_ACCESS_TOKEN
-        sync: false
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: DEFAULT_TIMEZONE
-        value: Asia/Kolkata
-      - key: GMAIL_CLIENT_ID
-        sync: false
-      - key: GMAIL_CLIENT_SECRET
-        sync: false
       - key: DATABASE_URL
         sync: false
-      - key: MONGODB_URI
-        sync: false
-      - key: MONGODB_DB
-        value: jarvis
+      - key: SQLITE_PATH
+        value: jarvis.db
       - key: KEEPALIVE_ENABLED
         value: "true"
       - key: PING_INTERVAL_SECONDS

@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
+import { LoginScreen } from './components/LoginScreen';
+import { ConnectedAccessoriesHub } from './components/ConnectedAccessoriesHub';
 import { ZipEditor } from './components/ZipEditor';
 import { DiffInspector } from './components/DiffInspector';
 import { ApiSimulator } from './components/ApiSimulator';
 import { CalendarEmailStudio } from './components/CalendarEmailStudio';
 import { AndroidSpecGuide } from './components/AndroidSpecGuide';
 import { DeployGuide } from './components/DeployGuide';
+import { GmailStudio } from './components/GmailStudio';
 import { INITIAL_JARVIS_FILES } from './data/defaultJarvisProject';
-import { ZipFileItem } from './types/zip';
+import { ZipFileItem, AuthUser } from './types/zip';
 import {
   loadZipFromUrl,
   loadZipFromArrayBuffer,
@@ -16,9 +19,75 @@ import {
 } from './utils/zipManager';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<string>('editor');
+  // Authentication Gateway State: User requests "just a login and through that connect Gmail and other accessories"
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('jarvis_auth_active') === 'true';
+  });
+
+  const [activeTab, setActiveTab] = useState<string>('accessories');
   const [files, setFiles] = useState<Record<string, ZipFileItem>>(INITIAL_JARVIS_FILES);
   const [downloadSuccessToast, setDownloadSuccessToast] = useState(false);
+
+  // Authenticated user state across the studio
+  const [currentUser, setCurrentUser] = useState<AuthUser>(() => {
+    const saved = localStorage.getItem('jarvis_current_user');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch {
+        // fallback
+      }
+    }
+    return {
+      id: 'usr_raj_01',
+      full_name: 'Raj Ashwin',
+      email: 'rajraswin51@gmail.com',
+      is_verified: true,
+      is_google_connected: true,
+      google_email: 'rajraswin51@gmail.com',
+    };
+  });
+
+  const [accessToken, setAccessToken] = useState<string>(
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c3JfcmFqXzAxIiwiZW1haWwiOiJyYWpyYXN3aW41MUBnbWFpbC5jb20iLCJleHAiOjE3NjI4MTM2MDB9.jarvis_signed_jwt_token'
+  );
+  const [refreshToken, setRefreshToken] = useState<string>('rt_f839a2bc901e4d77_token');
+
+  // Sync user updates to localStorage
+  const handleUpdateCurrentUser = (user: AuthUser) => {
+    setCurrentUser(user);
+    localStorage.setItem('jarvis_current_user', JSON.stringify(user));
+  };
+
+  const handleLoginSuccess = (user: AuthUser, accessTok: string, refreshTok: string) => {
+    setCurrentUser(user);
+    setAccessToken(accessTok);
+    setRefreshToken(refreshTok);
+    setIsAuthenticated(true);
+    setActiveTab('accessories');
+    localStorage.setItem('jarvis_auth_active', 'true');
+    localStorage.setItem('jarvis_current_user', JSON.stringify(user));
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    localStorage.removeItem('jarvis_auth_active');
+  };
+
+  const handleSkipLogin = () => {
+    const guestUser: AuthUser = {
+      id: `usr_guest_${Date.now().toString(36)}`,
+      full_name: 'Guest User',
+      email: '',
+      is_verified: true,
+      is_google_connected: false,
+    };
+    setCurrentUser(guestUser);
+    setIsAuthenticated(true);
+    setActiveTab('accessories');
+    localStorage.setItem('jarvis_auth_active', 'true');
+    localStorage.setItem('jarvis_current_user', JSON.stringify(guestUser));
+  };
 
   // Attempt to load the real on-disk zip file if available via static assets
   useEffect(() => {
@@ -26,14 +95,12 @@ export default function App() {
       try {
         const loaded = await loadZipFromUrl('/assets/aistudio/JARVIS-main_777a8304.zip');
         if (loaded && Object.keys(loaded).length > 0) {
-          // Merge with any initial meta
           setFiles((prev) => ({
             ...prev,
             ...loaded,
           }));
         }
       } catch (err) {
-        // Fall back gracefully to bundled virtual files
         console.log('Using bundled upgraded JARVIS virtual files:', err);
       }
     }
@@ -125,18 +192,53 @@ export default function App() {
 
   const modifiedCount = Object.values(files).filter((f) => f.isModified).length;
 
+  // If user is not yet logged in, render the clean Login & Account Gateway
+  if (!isAuthenticated) {
+    return (
+      <LoginScreen
+        onLoginSuccess={handleLoginSuccess}
+        onDownloadZip={handleDownloadZip}
+        onSkip={handleSkipLogin}
+      />
+    );
+  }
+
+  // Once authenticated, render the full JARVIS Terminal & Connected Accessories Hub
   return (
     <div className="min-h-screen bg-[#050b14] text-slate-100 flex flex-col font-sans selection:bg-cyan-500/30">
-      {/* Top Bar Contract (3 zones) */}
+      {/* Top Bar Navigation */}
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onDownloadZip={handleDownloadZip}
         isModifiedCount={modifiedCount}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Pane */}
       <main className="flex-1 overflow-hidden">
+        {activeTab === 'accessories' && (
+          <ConnectedAccessoriesHub
+            currentUser={currentUser}
+            setCurrentUser={handleUpdateCurrentUser}
+            accessToken={accessToken}
+            setAccessToken={setAccessToken}
+            refreshToken={refreshToken}
+            setRefreshToken={setRefreshToken}
+            onNavigateTab={(tab) => setActiveTab(tab)}
+            onLogout={handleLogout}
+            onDownloadZip={handleDownloadZip}
+          />
+        )}
+        {activeTab === 'gmail' && (
+          <GmailStudio
+            currentUser={currentUser}
+            onConnectGoogle={() => setActiveTab('accessories')}
+          />
+        )}
+        {activeTab === 'calendar' && <CalendarEmailStudio />}
+        {activeTab === 'simulator' && <ApiSimulator currentUser={currentUser} />}
         {activeTab === 'editor' && (
           <ZipEditor
             files={files}
@@ -150,8 +252,6 @@ export default function App() {
           />
         )}
         {activeTab === 'diff' && <DiffInspector files={files} />}
-        {activeTab === 'simulator' && <ApiSimulator />}
-        {activeTab === 'services' && <CalendarEmailStudio />}
         {activeTab === 'android' && <AndroidSpecGuide />}
         {activeTab === 'deploy' && <DeployGuide />}
       </main>

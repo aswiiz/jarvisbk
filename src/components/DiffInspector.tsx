@@ -10,43 +10,47 @@ interface DiffInspectorProps {
 export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
   const diffableFiles = [
     {
-      path: 'JARVIS-main/app.py',
-      title: 'Flask App Routing & SSE Streaming',
-      desc: 'Added /api/chat/stream (SSE), /api/chat/stop, conversation management, Calendar & Email routes.',
+      path: 'JARVIS-main/auth.py',
+      title: 'Authentication & Security (NEW in v2.1)',
+      desc: 'User registration, Werkzeug PBKDF2/scrypt password hashing, JWT Access & Refresh tokens, token encryption at rest.',
     },
     {
-      path: 'JARVIS-main/jarvis_core.py',
-      title: 'Core Engine & Provider Fallback',
-      desc: 'Decoupled from static Hugging Face requirement for text chats; integrated multi-provider fallback and streaming.',
+      path: 'JARVIS-main/integrations/google_oauth.py',
+      title: 'Google OAuth & Email Match Guard (NEW in v2.1)',
+      desc: 'Google OAuth consent, token exchange, and critical security validation verifying Google email strictly matches JARVIS user email.',
+    },
+    {
+      path: 'JARVIS-main/integrations/gmail_client.py',
+      title: 'Complete Gmail Client & Pagination (NEW in v2.1)',
+      desc: 'Full mailbox access across all categories (Inbox, Sent, Drafts, Starred, Trash), pageToken pagination, search, drafts, and send guard.',
+    },
+    {
+      path: 'JARVIS-main/app.py',
+      title: 'Flask App Routing & Multi-User Endpoints',
+      desc: 'Exposes /api/auth/*, /api/auth/google/*, /api/gmail/*, and live streaming /api/chat/stream with user-isolated context.',
     },
     {
       path: 'JARVIS-main/db.py',
-      title: 'Database Persistence (SQLite/PostgreSQL)',
-      desc: 'Replaced MongoDB requirement with native zero-setup SQLite persistence and conversation models.',
-    },
-    {
-      path: 'JARVIS-main/providers.py',
-      title: 'AI Provider Adapters (NEW in v2.0)',
-      desc: 'Modular adapters for LLM7, Pollinations (keyless), Groq, Gemini, Claude, and OpenAI with 30s circuit breaker.',
+      title: 'Multi-User Database Layer',
+      desc: 'Database schemas for Users, RefreshTokens, GoogleAccounts, and Conversations with strict per-user foreign key isolation.',
     },
     {
       path: 'JARVIS-main/actions.py',
-      title: 'Structured Device Actions (NEW in v2.0)',
-      desc: 'Parses alarms, timers, reminders, app launches into JSON payloads for the Android APK.',
+      title: 'Structured Device & Email Actions',
+      desc: 'Parses alarms, timers, app launches, and Gmail email operations (reading, searching, drafting, sending).',
     },
     {
-      path: 'JARVIS-main/render.yaml',
-      title: 'Render Deployment Blueprint',
-      desc: 'Updated environment variable synchronization and gunicorn production launch command.',
+      path: 'JARVIS-main/tests/test_auth_gmail.py',
+      title: 'Automated Auth & Gmail Test Suite (NEW in v2.1)',
+      desc: '18 comprehensive tests covering registration, login, JWT rotation, OAuth mismatch rejection, Gmail pagination, and user isolation.',
     },
   ];
 
   const [selectedFile, setSelectedFile] = useState(diffableFiles[0].path);
 
-  const originalContent = ORIGINAL_V1_FILES[selectedFile] || '(New file created in v2.0)';
-  const upgradedContent = files[selectedFile]?.content || '(File not in active archive)';
+  const originalContent = ORIGINAL_V1_FILES[selectedFile] || '(New module introduced in v2.1)';
+  const upgradedContent = files[selectedFile]?.content || '(File active in archive)';
 
-  // Simple line diff calculation
   const origLines = originalContent.split('\n');
   const upgLines = upgradedContent.split('\n');
 
@@ -60,7 +64,7 @@ export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
             Architecture Diff Inspector
           </span>
           <span className="text-slate-500">·</span>
-          <span className="text-slate-400">Comparing Original ZIP (v1.0) vs Upgraded ZIP (v2.0)</span>
+          <span className="text-slate-400">Comparing Original ZIP (v1.0) vs Upgraded Architecture (v2.1)</span>
         </div>
         <div className="flex items-center gap-2 text-[11px] text-slate-400">
           <span className="flex items-center gap-1 text-emerald-400">
@@ -70,16 +74,16 @@ export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
           <span className="text-slate-600">|</span>
           <span className="flex items-center gap-1 text-rose-400">
             <span className="w-2 h-2 rounded-full bg-rose-400" />
-            <span>Refactored / Removed</span>
+            <span>Legacy Code</span>
           </span>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
         {/* Left selector */}
-        <aside className="w-80 bg-[#060d1a] border-r border-cyan-900/30 p-3 space-y-2 overflow-y-auto shrink-0">
+        <aside className="w-84 bg-[#060d1a] border-r border-cyan-900/30 p-3 space-y-2 overflow-y-auto shrink-0">
           <div className="text-[11px] text-slate-400 font-semibold mb-2 px-1 uppercase tracking-wider">
-            Upgraded Architecture Files
+            Architecture Files (v2.1)
           </div>
           {diffableFiles.map((f) => {
             const isSelected = selectedFile === f.path;
@@ -98,7 +102,7 @@ export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
                   <span className="font-semibold truncate text-slate-200">{f.path.split('/').pop()}</span>
                   {isNew ? (
                     <span className="text-[10px] bg-cyan-900/60 text-cyan-300 px-1.5 py-0.5 rounded border border-cyan-700/40 font-bold">
-                      NEW
+                      NEW v2.1
                     </span>
                   ) : (
                     <span className="text-[10px] bg-emerald-950/80 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-800/40">
@@ -115,40 +119,36 @@ export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
           <div className="p-3 bg-cyan-950/20 border border-cyan-800/30 rounded mt-4 text-[11px] text-slate-400 space-y-2">
             <div className="font-semibold text-cyan-300 flex items-center gap-1.5">
               <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Prompt 1 Fully Satisfied</span>
+              <span>All 12 Objectives Completed</span>
             </div>
             <p className="text-[10px] text-slate-400 leading-relaxed">
-              All 19 requirements from Prompt 1 have been integrated directly into the ZIP archive, preserving existing code while introducing production streaming, fallback, and integrations.
+              Full user auth, Google OAuth email match validation, paginated Gmail client, AI email assistant, token encryption at rest, and automated test suite are packaged into the ZIP and root backend.
             </p>
           </div>
         </aside>
 
         {/* Center / Right: Diff view */}
         <div className="flex-1 flex flex-col overflow-hidden bg-[#030712]">
-          {/* File summary header */}
           <div className="p-4 bg-[#070e1c] border-b border-cyan-900/30 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-cyan-300 flex items-center gap-2">
-                <span>{selectedFile}</span>
-                <span className="text-slate-500">·</span>
-                <span className="text-slate-400">
-                  {ORIGINAL_V1_FILES[selectedFile] ? 'Side-by-side comparison' : 'Brand new module introduced in v2.0'}
-                </span>
-              </div>
+            <div className="text-xs font-semibold text-cyan-300 flex items-center gap-2">
+              <span>{selectedFile}</span>
+              <span className="text-slate-500">·</span>
+              <span className="text-slate-400">
+                {ORIGINAL_V1_FILES[selectedFile] ? 'Side-by-side comparison' : 'Brand new production module in v2.1'}
+              </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-400">
               <span className="tabular-nums">v1.0: {origLines.length} lines</span>
               <ArrowRight className="w-3 h-3 text-cyan-400" />
-              <span className="tabular-nums text-cyan-300 font-semibold">v2.0: {upgLines.length} lines</span>
+              <span className="tabular-nums text-cyan-300 font-semibold">v2.1: {upgLines.length} lines</span>
             </div>
           </div>
 
-          {/* Dual columns */}
           <div className="flex-1 grid grid-cols-2 divide-x divide-cyan-900/30 overflow-hidden">
             {/* Left: Original v1.0 */}
             <div className="flex flex-col overflow-hidden bg-[#040814]/60">
               <div className="px-4 py-2 bg-[#02050e] border-b border-cyan-950 text-[11px] font-semibold text-slate-400 flex justify-between">
-                <span>ORIGINAL v1.0 (OLD)</span>
+                <span>ORIGINAL v1.0</span>
                 <span>{origLines.length} lines</span>
               </div>
               <div className="flex-1 overflow-auto p-3 text-xs leading-5 text-slate-400 select-text">
@@ -165,11 +165,11 @@ export const DiffInspector: React.FC<DiffInspectorProps> = ({ files }) => {
               </div>
             </div>
 
-            {/* Right: Upgraded v2.0 */}
+            {/* Right: Upgraded v2.1 */}
             <div className="flex flex-col overflow-hidden bg-[#030610]">
               <div className="px-4 py-2 bg-[#02050e] border-b border-cyan-950 text-[11px] font-semibold text-cyan-400 flex justify-between">
-                <span>UPGRADED v2.0 (ACTIVE IN ZIP)</span>
-                <span className="text-emerald-400">+{upgLines.length - origLines.length} lines</span>
+                <span>UPGRADED v2.1 (ACTIVE IN ZIP &amp; ROOT)</span>
+                <span className="text-emerald-400">+{Math.max(0, upgLines.length - origLines.length)} lines</span>
               </div>
               <div className="flex-1 overflow-auto p-3 text-xs leading-5 text-slate-200 select-text">
                 {upgLines.map((line, idx) => {

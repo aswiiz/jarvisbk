@@ -35,6 +35,9 @@ export interface DeviceAction {
   query?: string;
   due?: string;
   label?: string;
+  category?: string;
+  recipient?: string;
+  filter?: string;
   requires_confirmation?: boolean;
 }
 
@@ -57,13 +60,37 @@ export interface CalendarEvent {
   description?: string;
 }
 
+export interface EmailAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface EmailMessage {
   id: string;
+  threadId?: string;
   sender: string;
   recipient: string;
+  cc?: string;
   subject: string;
   snippet: string;
-  body: string;
+  body?: string;
+  body_plain: string;
+  body_html: string;
   date: string;
+  is_unread: boolean;
+  is_starred: boolean;
+  labels: string[];
+  attachments: EmailAttachment[];
   status?: 'inbox' | 'draft' | 'sent';
+}
+
+export interface AuthUser {
+  id: string;
+  full_name: string;
+  email: string;
+  is_verified: boolean;
+  is_google_connected: boolean;
+  google_email?: string;
 }

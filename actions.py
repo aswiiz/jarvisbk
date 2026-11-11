@@ -1,7 +1,7 @@
 """Structured Assistant and Device Actions for JARVIS.
 
-Interprets requests for Android device actions, alarms, timers, reminders, and system settings.
-The backend outputs structured action instructions so the Android client can execute them locally.
+Interprets requests for Android device actions, alarms, timers, reminders, system settings,
+and Gmail email operations (reading, searching, drafting, sending, replying).
 """
 import re
 from typing import Any, Dict, List, Optional
@@ -13,7 +13,6 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
     msg = user_message.lower().strip()
 
     # 1. Timers
-    # "set a timer for 5 minutes", "timer for 30 seconds", "start 10 minute timer"
     timer_match = re.search(r'(?:set|start|create)?\s*(?:a\s+)?timer\s+(?:for\s+)?(\d+)\s*(min(?:ute)?s?|sec(?:ond)?s?|hours?|hrs?)', msg)
     if timer_match:
         val = int(timer_match.group(1))
@@ -33,7 +32,6 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
         })
 
     # 2. Alarms
-    # "set alarm for 6 am", "wake me up at 7:30 am", "set alarm for 06:00"
     alarm_match = re.search(r'(?:set\s+(?:an?\s+)?alarm(?:\s+for)?|wake\s+me\s+up\s+at)\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)', msg)
     if alarm_match:
         time_str = alarm_match.group(1).strip()
@@ -46,7 +44,6 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
         })
 
     # 3. Reminders
-    # "remind me to buy milk tomorrow at 5pm", "create reminder to call John"
     reminder_match = re.search(r'remind\s+(?:me\s+to\s+|me\s+about\s+)(.+?)(?:\s+(?:at|on|tomorrow|in)\s+(.+))?$', msg)
     if reminder_match:
         task_text = reminder_match.group(1).strip()
@@ -59,8 +56,27 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
             "requires_confirmation": False,
         })
 
-    # 4. App Launching
-    # "open youtube", "launch spotify", "open camera", "open whatsapp", "open maps"
+    # 4. Email Operations (Gmail Integration)
+    if any(k in msg for k in ("inbox", "unread email", "check my email", "check email", "read email", "my emails")):
+        actions.append({
+            "type": "email_action",
+            "action": "list_emails",
+            "category": "inbox",
+            "filter": "unread" if "unread" in msg else "all",
+            "requires_confirmation": False,
+        })
+
+    draft_match = re.search(r'(?:draft|write|compose|send)\s+(?:an?\s+)?email\s+(?:to\s+)?([^\s@]+@[^\s@]+\.[^\s@]+|[a-zA-Z\s]+)', msg)
+    if draft_match and not any(k in msg for k in ("check", "list", "read")):
+        to_target = draft_match.group(1).strip()
+        actions.append({
+            "type": "email_action",
+            "action": "draft_email",
+            "recipient": to_target,
+            "requires_confirmation": True,
+        })
+
+    # 5. App Launching
     app_match = re.search(r'(?:open|launch|start)\s+(?:the\s+)?(camera|youtube|spotify|maps|calendar|settings|whatsapp|chrome|calculator|gallery|music|gmail|email)', msg)
     if app_match:
         app_name = app_match.group(1)
@@ -71,8 +87,7 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
             "requires_confirmation": False,
         })
 
-    # 5. Settings navigation
-    # "open wifi settings", "open bluetooth settings", "turn on bluetooth"
+    # 6. Settings navigation
     settings_match = re.search(r'(?:open|go\s+to)\s+(wifi|bluetooth|display|sound|battery|airplane\s+mode)\s+settings?', msg)
     if settings_match:
         section = settings_match.group(1).replace(" ", "_")
@@ -83,8 +98,7 @@ def extract_device_actions(user_message: str, assistant_response: str) -> List[D
             "requires_confirmation": False,
         })
 
-    # 6. Navigation / Map queries
-    # "navigate to Central Park", "directions to airport", "take me to coffee shop"
+    # 7. Navigation / Map queries
     nav_match = re.search(r'(?:navigate\s+to|directions\s+to|take\s+me\s+to|route\s+to)\s+(.+)', msg)
     if nav_match:
         destination = nav_match.group(1).strip()

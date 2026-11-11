@@ -7,3 +7,5 @@ requests>=2.32
 python-dotenv>=1.0
 pillow>=10.3
 pymongo>=4.8
+PyJWT>=2.8.0
+cryptography>=42.0.0
