@@ -21,8 +21,33 @@ import secrets
 import time
 from typing import Any, Dict, Optional, Tuple
 
-from flask import g, jsonify, request
-from werkzeug.security import check_password_hash, generate_password_hash
+try:
+    from flask import g, jsonify, request
+except ImportError:
+    g = None
+    jsonify = None
+    request = None
+
+try:
+    from werkzeug.security import check_password_hash, generate_password_hash
+except ImportError:
+    # Zero-dependency standard library fallback using hashlib pbkdf2_hmac
+    def generate_password_hash(password: str, method: str = "pbkdf2:sha256") -> str:
+        salt = secrets.token_hex(16)
+        h = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000)
+        return f"pbkdf2:sha256:100000${salt}${h.hex()}"
+
+    def check_password_hash(p_hash: str, password: str) -> bool:
+        try:
+            parts = p_hash.split("$")
+            if len(parts) == 3:
+                salt = parts[1]
+                stored_h = parts[2]
+                computed = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 100000).hex()
+                return hmac.compare_digest(stored_h, computed)
+            return False
+        except Exception:
+            return False
 
 log = logging.getLogger("jarvis.auth")
 
@@ -159,40 +184,94 @@ def decrypt_token(encrypted_str: str) -> str:
         return encrypted_str
 
 
+# ---------- App API Token Management (for Android APK & Integrations) ----------
+
+def get_app_api_token() -> str:
+    """Retrieve the persistent server APP_API_TOKEN from os.environ or .env file.
+    Reuses the existing token across server restarts and deployments.
+    Never regenerates if a token already exists.
+    Never prints or exposes the token value.
+    """
+    # 1. Direct environment variable lookup
+    token = os.environ.get("APP_API_TOKEN", "").strip()
+    if token and token != "your-random-api-token-here":
+        return token
+
+    # 2. Check persistent .env file on disk
+    env_paths = [
+        os.path.join(os.path.dirname(__file__), ".env"),
+        os.path.join(os.getcwd(), ".env"),
+    ]
+    for env_path in env_paths:
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            if k.strip() == "APP_API_TOKEN":
+                                val = v.strip().strip('"').strip("'")
+                                if val and val != "your-random-api-token-here":
+                                    os.environ["APP_API_TOKEN"] = val
+                                    return val
+            except Exception as exc:
+                log.debug("Error reading .env for APP_API_TOKEN: %s", exc)
+
+    # 3. If missing from both environment and file, generate once and persist to .env
+    new_token = secrets.token_hex(32)
+    os.environ["APP_API_TOKEN"] = new_token
+    primary_env = os.path.join(os.path.dirname(__file__), ".env")
+    try:
+        flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+        fd = os.open(primary_env, flags, 0o600)
+        with open(fd, "a", encoding="utf-8") as f:
+            f.write(f"\n# JARVIS Persistent App API Token for APK and Backend\nAPP_API_TOKEN={new_token}\n")
+    except Exception as exc:
+        log.warning("Could not persist APP_API_TOKEN to .env: %s", exc)
+
+    return new_token
+
+
 # ---------- Flask Authentication Decorators ----------
 
 def require_auth(fn):
-    """Enforce authenticated user via JWT Bearer token or fallback API token."""
+    """Enforce authenticated user via JWT Bearer token or master APP_API_TOKEN (X-API-Token)."""
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        auth_header = request.headers.get("Authorization", "")
+        auth_header = request.headers.get("Authorization", "").strip()
         token = ""
         if auth_header.lower().startswith("bearer "):
             token = auth_header[7:].strip()
         elif request.headers.get("X-API-Token"):
             token = request.headers.get("X-API-Token", "").strip()
+        elif request.headers.get("x-api-token"):
+            token = request.headers.get("x-api-token", "").strip()
 
         if not token:
             if os.getenv("ALLOW_NO_AUTH", "").lower() in ("1", "true", "yes"):
                 g.user_id = "default_user"
                 g.user_email = "user@jarvis.ai"
+                g.auth_type = "no_auth"
                 return fn(*args, **kwargs)
-            return jsonify(status="error", error="Authorization header required (Bearer <token>)"), 401
+            return jsonify(status="error", error="Authorization header required (Bearer <token> or X-API-Token)"), 401
 
-        # Check if master APP_API_TOKEN is provided (for system tools or legacy clients)
-        app_token = os.getenv("APP_API_TOKEN", "").strip()
-        if app_token and hmac.compare_digest(token.encode(), app_token.encode()):
+        # Check if master APP_API_TOKEN is provided (for Android APK client or automation)
+        app_token = os.environ.get("APP_API_TOKEN", "").strip() or get_app_api_token()
+        if app_token and hmac.compare_digest(token.encode("utf-8"), app_token.encode("utf-8")):
             g.user_id = "admin_user"
             g.user_email = os.getenv("ADMIN_EMAIL", "admin@jarvis.ai")
+            g.auth_type = "app_api_token"
             return fn(*args, **kwargs)
 
-        # Decode user JWT
+        # Decode user JWT (for web and mobile user sessions)
         try:
             payload = decode_jwt_token(token)
             if payload.get("type") != "access":
                 return jsonify(status="error", error="Invalid token type, expected access token"), 401
             g.user_id = payload.get("sub")
             g.user_email = payload.get("email")
+            g.auth_type = "jwt"
             if not g.user_id:
                 return jsonify(status="error", error="Token missing subject"), 401
         except ValueError as exc:

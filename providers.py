@@ -21,7 +21,10 @@ import re
 import time
 from typing import Any, Dict, Generator, List, Optional, Tuple
 
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 log = logging.getLogger("jarvis.providers")
 

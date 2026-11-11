@@ -50,6 +50,7 @@ from auth import (
     REFRESH_TOKEN_EXPIRE_DAYS,
     decode_jwt_token,
     generate_user_tokens,
+    get_app_api_token,
     hash_password,
     require_auth,
     verify_password,
@@ -76,6 +77,9 @@ oauth_svc = GoogleOAuthService()
 gmail_svc = GmailService(oauth_svc)
 calendar_svc = CalendarService()
 location_svc = LocationService()
+
+# Ensure master APP_API_TOKEN is securely persisted and loaded into os.environ
+get_app_api_token()
 
 STARTED = time.time()
 ACTIVE_GENERATIONS = set()

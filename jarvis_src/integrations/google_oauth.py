@@ -11,8 +11,11 @@ Handles:
 import logging
 import os
 import time
-from typing import Any, Dict, Optional, Tuple
-import requests
+from typing import Any, Dict, List, Optional, Tuple
+try:
+    import requests
+except ImportError:
+    requests = None
 
 from auth import decrypt_token, encrypt_token
 

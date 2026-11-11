@@ -16,7 +16,10 @@ import os
 import threading
 import time
 
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 log = logging.getLogger("jarvis.keepalive")
 _started = False

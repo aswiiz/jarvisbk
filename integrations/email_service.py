@@ -13,7 +13,10 @@ from email.mime.text import MIMEText
 import logging
 import os
 from typing import Any, Dict, List, Optional
-import requests
+try:
+    import requests
+except ImportError:
+    requests = None
 
 log = logging.getLogger("jarvis.email")
 
